@@ -16,8 +16,14 @@ object UpdateLog {
     class Release(val version: String, val date: String, val headline: String, val sections: List<Section>)
 
     val RELEASES = listOf(
+        Release("2.5", "November 2026", "New Icons", listOf(
+    Section("New", listOf(
+        "Changed Iconic icons into amber icon.",
+        "New Bugs fixed",
+    )),
+)),
         Release("2.0", "November 2026", "AI Assistant and MCP, terrain, new templates, lighting effects, icon themes, better avatars and animations, and lots of fixes", listOf(
-            Section("New", listOf(
+            Section("Old", listOf(
                 "AI Assistant (Home → AI → Assistant): chat with Claude to build in your place, like Roblox Studio's Assistant. It can create parts, models, terrain, lighting and GUIs, write scripts, and read the Explorer, your selection and the Output. Setup is 3 steps, all on your phone: open the Anthropic Console, copy a key, tap Paste (the key is checked for free and stored only on this device). \"Undo AI changes\" puts the place back.",
                 "Connect an AI app (Assistant → Connect an AI app): an MCP server like Roblox Studio's, so other AI apps that support MCP can build in Studio. Apps on the same phone connect directly (no computer needed); a computer can connect over USB or Wi-Fi (optional). It's off until you turn it on and protected by a secret key.",
                 "Smooth terrain: places with terrain now show it (grass, rock, sand, snow… with Roblox's colors), with water you can swim in, collisions, shadows, and terrain saved and published exactly like Roblox Studio.",
