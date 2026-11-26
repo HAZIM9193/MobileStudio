@@ -21,14 +21,17 @@ object RbxFile {
     fun unwrap(b: ByteArray): ByteArray =
         if (b.size > 2 && b[0] == 0x1F.toByte() && b[1] == 0x8B.toByte()) java.util.zip.GZIPInputStream(b.inputStream()).use { it.readBytes() } else b
 
-    fun read(b0: ByteArray): RbxDocument {
+    /** [progress] receives 0..100 while the file is read (used by the loading bar). */
+    fun read(b0: ByteArray, progress: (Int) -> Unit = {}): RbxDocument {
         val b = unwrap(b0)
+        progress(2)
         val doc = when {
-            isBinary(b) -> RbxBinaryReader(b).read()
-            isXml(b) -> RbxXmlReader.read(b)
+            isBinary(b) -> RbxBinaryReader(b, progress).read()
+            isXml(b) -> { progress(10); RbxXmlReader.read(b).also { progress(95) } }
             else -> throw RbxFormatException("Not a Roblox place or model file")
         }
         normalize(doc)
+        progress(100)
         return doc
     }
 
@@ -203,7 +206,7 @@ private fun rotationFromId(id: Int): CFrame {
 
 // ---------------------------------------------------------------------------------------------
 
-class RbxBinaryReader(private val data: ByteArray) {
+class RbxBinaryReader(private val data: ByteArray, private val progress: (Int) -> Unit = {}) {
     private class Chunk(val name: String, val data: ByteArray)
     private class ClassInfo(val name: String, val refs: IntArray)
 
@@ -230,17 +233,23 @@ class RbxBinaryReader(private val data: ByteArray) {
                 decompress(data, start, comp, uncomp)
             }
             chunks.add(Chunk(name, body))
+            progress((r.pos.toLong() * 40 / data.size).toInt())
             if (name == "END") break
         }
         for (c in chunks) if (c.name == "META") readMeta(c.data)
         for (c in chunks) if (c.name == "SSTR") readSstr(c.data)
         for (c in chunks) if (c.name == "INST") readInst(c.data)
-        for (c in chunks) if (c.name == "PROP") {
+        progress(45)
+        val propChunks = chunks.filter { it.name == "PROP" }
+        for ((i, c) in propChunks.withIndex()) {
             try { readProp(c.data) } catch (e: Exception) { warnings.add("Skipped a property: ${e.message}") }
+            progress(45 + (i + 1) * 45 / propChunks.size)
         }
         for ((inst, prop, ref) in pendingRefs) inst.props[prop] = if (ref < 0) null else instances[ref]
+        progress(92)
         val roots = ArrayList<Instance>()
         for (c in chunks) if (c.name == "PRNT") readPrnt(c.data, roots)
+        progress(98)
         for (c in chunks) if (c.name !in setOf("META", "SSTR", "INST", "PROP", "PRNT", "END", "SIGN"))
             warnings.add("Ignored unknown chunk ${c.name}")
         return RbxDocument(roots, meta, warnings)
