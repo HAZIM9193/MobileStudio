@@ -923,6 +923,10 @@ class MainActivity : AppCompatActivity(), MainActions, Studio.Listener, StartScr
 
     private fun about() = AboutDialog.show(this)
 
+    private fun errText(e: Throwable): String =
+        if (e is OutOfMemoryError) "Not enough memory to open this file on this device. Close other apps and try again."
+        else (e.message ?: e.toString())
+
     private fun confirmDiscard(then: () -> Unit) {
         if (!studio.dirty) { then(); return }
         val c = studio.cloud
@@ -964,8 +968,10 @@ class MainActivity : AppCompatActivity(), MainActions, Studio.Listener, StartScr
             }.start()
             return
         }
+        val lp = if (mode == OpenMode.PLACE || mode == OpenMode.TOOLBOX) LoadProgress(this, "Opening $name") else null
         Thread {
             try {
+                lp?.update(1, "Reading file")
                 val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: throw Exception("Could not read file")
                 when (mode) {
                     OpenMode.ICONS -> {}
@@ -974,20 +980,23 @@ class MainActivity : AppCompatActivity(), MainActions, Studio.Listener, StartScr
                         runOnUiThread { studio.plugins.load(f); studio.notifyPluginButtons(); pluginsChanged(); toast("Installed ${f.nameWithoutExtension}") }
                     }
                     OpenMode.TOOLBOX -> {
-                        val doc = RbxFile.read(bytes)
+                        val doc = RbxFile.read(bytes) { p -> lp?.update(5 + p * 90 / 100, "Reading $name") }
                         if (RbxFile.isPlace(doc)) throw Exception("This is a place file. Use File → Open to open places; the Toolbox holds models (.rbxm).")
                         val cls = doc.roots.firstOrNull()?.className
-                        runOnUiThread { toolbox.saveToLibrary(name, RbxFile.unwrap(bytes), cls); dock.setShown("toolbox", true); toast("Added $name to Toolbox") }
+                        runOnUiThread { lp?.dismiss(); toolbox.saveToLibrary(name, RbxFile.unwrap(bytes), cls); dock.setShown("toolbox", true); toast("Added $name to Toolbox") }
                     }
                     OpenMode.PLACE -> {
-                        val doc = RbxFile.read(bytes)
+                        val doc = RbxFile.read(bytes) { p -> lp?.update(5 + p * 70 / 100, "Reading $name") }
                         val isXml = !RbxFile.isBinary(RbxFile.unwrap(bytes))
                         doc.warnings.take(20).forEach { OutputLog.warn(it) }
                         if (doc.warnings.size > 20) OutputLog.warn("…and ${doc.warnings.size - 20} more warnings")
                         if (RbxFile.isPlace(doc)) {
+                            lp?.update(78, "Building place")
                             val dm = PlaceFactory.fromDocument(doc)
                             val count = dm.descendants().size
+                            lp?.update(100, "Done")
                             runOnUiThread {
+                                lp?.dismiss()
                                 confirmDiscard {
                                     closeAllScripts()
                                     studio.replaceEditModel(dm, uri, name, isXml)
@@ -997,15 +1006,17 @@ class MainActivity : AppCompatActivity(), MainActions, Studio.Listener, StartScr
                             }
                         } else {
                             runOnUiThread {
+                                lp?.dismiss()
                                 studio.insertDocument(doc)
                                 OutputLog.info("Inserted ${doc.roots.size} object(s) from $name")
                             }
                         }
                     }
                 }
-            } catch (e: Exception) {
-                OutputLog.error("Failed to open $name: ${e.message}")
-                runOnUiThread { Dialogs.themed(this).setTitle("Couldn't open file").setMessage("$name\n\n${e.message}").setPositiveButton("OK", null).show() }
+            } catch (e: Throwable) {
+                lp?.dismiss()
+                OutputLog.error("Failed to open $name: ${errText(e)}")
+                runOnUiThread { Dialogs.themed(this).setTitle("Couldn't open file").setMessage("$name\n\n${errText(e)}").setPositiveButton("OK", null).show() }
             }
         }.start()
     }
@@ -1063,13 +1074,17 @@ class MainActivity : AppCompatActivity(), MainActions, Studio.Listener, StartScr
     }
 
     override fun openPlaceBytes(name: String, bytes: ByteArray, cloud: CloudPlace?) {
+        val lp = LoadProgress(this, "Opening $name")
         Thread {
             try {
-                val doc = RbxFile.read(bytes)
+                val doc = RbxFile.read(bytes) { p -> lp.update(p * 75 / 100, "Reading $name") }
                 doc.warnings.take(10).forEach { OutputLog.warn(it) }
+                lp.update(78, "Building place")
                 val dm = PlaceFactory.fromDocument(doc)
                 val count = dm.descendants().size
+                lp.update(100, "Done")
                 runOnUiThread {
+                    lp.dismiss()
                     confirmDiscard {
                         closeAllScripts()
                         studio.replaceEditModel(dm, null, name, false, cloud)
@@ -1079,9 +1094,10 @@ class MainActivity : AppCompatActivity(), MainActions, Studio.Listener, StartScr
                         updateTitle()
                     }
                 }
-            } catch (e: Exception) {
-                OutputLog.error("Failed to open $name: ${e.message}")
-                runOnUiThread { Dialogs.themed(this).setTitle("Couldn't open place").setMessage(e.message).setPositiveButton("OK", null).show() }
+            } catch (e: Throwable) {
+                lp.dismiss()
+                OutputLog.error("Failed to open $name: ${errText(e)}")
+                runOnUiThread { Dialogs.themed(this).setTitle("Couldn't open place").setMessage(errText(e)).setPositiveButton("OK", null).show() }
             }
         }.start()
     }
