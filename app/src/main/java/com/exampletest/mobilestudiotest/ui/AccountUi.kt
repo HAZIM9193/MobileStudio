@@ -179,20 +179,24 @@ object AccountUi {
         box.addView(Ui.button(act, "Open the API Keys page") {
             try { act.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://create.roblox.com/dashboard/credentials"))) } catch (_: Exception) {}
         }, Ui.lp(Ui.MATCH, Ui.WRAP).apply { topMargin = Ui.dp(act, 8f) })
-        val key = Ui.input(act, RobloxApi.apiKey(act), "Open Cloud API key").apply { inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD }
+        val saved = RobloxApi.apiKey(act).isNotEmpty()
+        if (saved) box.addView(Ui.text(act, "An API key is already saved on this device. Leave the box empty and tap Next to keep using it, or paste a new key to replace it.", 12f, Ui.DIM).apply { isSingleLine = false; setPadding(0, Ui.dp(act, 12f), 0, 0) })
+        val key = Ui.input(act, "", if (saved) "Saved key in use (leave empty to keep it)" else "Open Cloud API key").apply { inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD }
         box.addView(key, Ui.lp(Ui.MATCH, Ui.WRAP).apply { topMargin = Ui.dp(act, 8f) })
         box.addView(Ui.text(act, "Or paste a .ROBLOSECURITY cookie instead of signing in. Anyone with it can use your account, so only do this on your own device.", 12f, Ui.DIM).apply { isSingleLine = false; setPadding(0, Ui.dp(act, 12f), 0, 0) })
         val cookie = Ui.input(act, "", if (signedIn(act)) "(signed in — leave empty to keep)" else ".ROBLOSECURITY cookie").apply { inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD }
         box.addView(cookie, Ui.lp(Ui.MATCH, Ui.WRAP).apply { topMargin = Ui.dp(act, 8f) })
         Dialogs.themed(act).setTitle("Open Cloud API key").setView(android.widget.ScrollView(act).apply { addView(box) })
-            .setPositiveButton("Save") { _, _ ->
-                RobloxApi.setApiKey(act, key.text.toString())
+            .setPositiveButton(if (saved) "Next" else "Save") { _, _ ->
+                val typed = key.text.toString().trim()
+                if (typed.isNotEmpty()) RobloxApi.setApiKey(act, typed)
                 val c = cookie.text.toString().trim()
                 if (c.isNotEmpty()) {
                     RobloxApi.setCookie(act, c)
                     background(act, "Checking your account…", { RobloxCloud.currentUser(act) }) { u -> toast(act, "Signed in as @${u.name}"); Avatar.refresh(act); then?.invoke() }
                 } else then?.invoke()
             }
+            .setNeutralButton(if (saved) "Remove key" else null) { _, _ -> RobloxApi.setApiKey(act, ""); toast(act, "API key removed") }
             .setNegativeButton("Cancel", null).show()
     }
 
