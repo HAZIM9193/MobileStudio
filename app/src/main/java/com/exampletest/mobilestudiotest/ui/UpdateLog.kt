@@ -16,6 +16,11 @@ object UpdateLog {
     class Release(val version: String, val date: String, val headline: String, val sections: List<Section>)
 
     val RELEASES = listOf(
+        Release("6.0", "November 2026", "Several fixes", listOf(
+    Section("Compressed local files", listOf(
+        "It's fixed. If you save where you want it, it will be compressed to a smaller size.",
+    )),
+)),
         Release("5.0", "November 2026", "New Progress Bar of loading Place or loading model", listOf(
     Section("New", listOf(
         "Added because wanted to notice the user to know that the loading is still didnt complete.",
