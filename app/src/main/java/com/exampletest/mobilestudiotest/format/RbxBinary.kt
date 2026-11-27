@@ -207,7 +207,12 @@ private fun rotationFromId(id: Int): CFrame {
 // ---------------------------------------------------------------------------------------------
 
 class RbxBinaryReader(private val data: ByteArray, private val progress: (Int) -> Unit = {}) {
-    private class Chunk(val name: String, val data: ByteArray)
+    /** Remembers where a chunk sits in the file and unpacks it only when used, so the whole file is never unpacked at once. */
+    private inner class Chunk(val name: String, private val start: Int, private val comp: Int, private val uncomp: Int) {
+        val data: ByteArray
+            get() = if (comp == 0) this@RbxBinaryReader.data.copyOfRange(start, start + uncomp)
+                    else decompress(this@RbxBinaryReader.data, start, comp, uncomp)
+    }
     private class ClassInfo(val name: String, val refs: IntArray)
 
     private val warnings = ArrayList<String>()
@@ -227,12 +232,10 @@ class RbxBinaryReader(private val data: ByteArray, private val progress: (Int) -
         while (r.remaining() >= 16) {
             val name = String(r.bytes(4), Charsets.ISO_8859_1).trimEnd('\u0000')
             val comp = r.i32(); val uncomp = r.i32(); r.i32()
-            val body = if (comp == 0) r.bytes(uncomp) else {
-                val start = r.pos
-                r.bytes(comp)
-                decompress(data, start, comp, uncomp)
-            }
-            chunks.add(Chunk(name, body))
+            val start = r.pos
+            r.pos += if (comp == 0) uncomp else comp
+            if (r.pos > data.size || r.pos < start) throw RbxFormatException("Unexpected end of file")
+            chunks.add(Chunk(name, start, comp, uncomp))
             progress((r.pos.toLong() * 40 / data.size).toInt())
             if (name == "END") break
         }
@@ -470,10 +473,20 @@ object RbxBinaryWriter {
         fun chunk(name: String, body: ByteArray) {
             val nb = name.toByteArray(Charsets.ISO_8859_1).copyOf(4)
             file.bytes(nb)
-            file.i32(0)
-            file.i32(body.size)
-            file.i32(0)
-            file.bytes(body)
+            val packed = if (body.size >= 64) {
+                try { com.github.luben.zstd.Zstd.compress(body, 3) } catch (e: Throwable) { null }
+            } else null
+            if (packed != null && packed.size < body.size) {
+                file.i32(packed.size)
+                file.i32(body.size)
+                file.i32(0)
+                file.bytes(packed)
+            } else {
+                file.i32(0)
+                file.i32(body.size)
+                file.i32(0)
+                file.bytes(body)
+            }
         }
 
         if (meta.isNotEmpty()) {
