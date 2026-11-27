@@ -16,6 +16,11 @@ object UpdateLog {
     class Release(val version: String, val date: String, val headline: String, val sections: List<Section>)
 
     val RELEASES = listOf(
+        Release("7.0", "November 2026", "New Content", listOf(
+    Section("New Feature", listOf(
+        "Now all the files you downloaded, and the files end like .rbxl .rbxm .rbxm .rbxlx .rbxmx You can open it with this app, and it will load it for you automatically.",
+    )),
+)),
         Release("6.5", "November 2026", "Several fixes", listOf(
     Section("Api Key Section", listOf(
         "If you have a previously saved Api key, the Ui section when publishing to roblox will be different. And it's better and easier to use.",
