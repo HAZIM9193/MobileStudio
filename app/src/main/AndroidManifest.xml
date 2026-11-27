@@ -44,6 +44,42 @@
                 <data android:mimeType="application/xml" />
                 <data android:mimeType="text/xml" />
             </intent-filter>
+            <!-- Roblox files recognised by their extension (file managers often give no useful MIME type) -->
+            <intent-filter tools:ignore="AppLinkUrlError">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:host="*" />
+                <data android:mimeType="*/*" />
+                <data android:pathPattern=".*\\.rbxl" />
+                <data android:pathPattern=".*\\..*\\.rbxl" />
+                <data android:pathPattern=".*\\..*\\..*\\.rbxl" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.rbxl" />
+                <data android:pathPattern=".*\\.rbxm" />
+                <data android:pathPattern=".*\\..*\\.rbxm" />
+                <data android:pathPattern=".*\\..*\\..*\\.rbxm" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.rbxm" />
+                <data android:pathPattern=".*\\.rbxlx" />
+                <data android:pathPattern=".*\\..*\\.rbxlx" />
+                <data android:pathPattern=".*\\..*\\..*\\.rbxlx" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.rbxlx" />
+                <data android:pathPattern=".*\\.rbxmx" />
+                <data android:pathPattern=".*\\..*\\.rbxmx" />
+                <data android:pathPattern=".*\\..*\\..*\\.rbxmx" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.rbxmx" />
+            </intent-filter>
+            <!-- Share sheet: Share -> Mobile Studio -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:mimeType="application/x-roblox-rbxl" />
+                <data android:mimeType="application/x-roblox-rbxm" />
+                <data android:mimeType="application/xml" />
+                <data android:mimeType="text/xml" />
+            </intent-filter>
         </activity>
     </application>
 
