@@ -16,6 +16,11 @@ object UpdateLog {
     class Release(val version: String, val date: String, val headline: String, val sections: List<Section>)
 
     val RELEASES = listOf(
+        Release("6.5", "November 2026", "Several fixes", listOf(
+    Section("Api Key Section", listOf(
+        "If you have a previously saved Api key, the Ui section when publishing to roblox will be different. And it's better and easier to use.",
+    )),
+)),
         Release("6.0", "November 2026", "Several fixes", listOf(
     Section("Compressed local files", listOf(
         "It's fixed. If you save where you want it, it will be compressed to a smaller size.",
