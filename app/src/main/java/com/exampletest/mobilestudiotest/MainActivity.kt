@@ -76,6 +76,8 @@ class MainActivity : AppCompatActivity(), MainActions, Studio.Listener, StartScr
 
     private enum class OpenMode { PLACE, TOOLBOX, PLUGIN, ICONS }
     private var openMode = OpenMode.PLACE
+    /** True when the file came from outside the app (Open with / Share): models then open in a new place. */
+    private var externalOpen = false
     private var pendingSave: (() -> ByteArray?)? = null
     private var pendingSaveIsPlace = false
 
@@ -133,7 +135,7 @@ class MainActivity : AppCompatActivity(), MainActions, Studio.Listener, StartScr
         }
         if (savedInstanceState == null) handleIntent(intent)
         // Like Studio, open on the start page (unless a file was opened with the app).
-        if (firstLaunch && intent?.action != Intent.ACTION_VIEW) showStart()
+        if (firstLaunch && intent?.action != Intent.ACTION_VIEW && intent?.action != Intent.ACTION_SEND) showStart()
         // After an update: what's new (once per version).
         if (firstLaunch) rootFrame.postDelayed({ if (!isFinishing) UpdateLog.showIfNew(this) }, 900)
     }
@@ -226,9 +228,19 @@ class MainActivity : AppCompatActivity(), MainActions, Studio.Listener, StartScr
         if (debuggable && i?.getBooleanExtra("play", false) == true) studio.main.post { studio.startPlay() }
         if (debuggable && i?.getBooleanExtra("stop", false) == true) studio.main.post { studio.stopPlay() }
         i?.getStringExtra("playas")?.let { n -> if (debuggable) studio.main.post { synchronized(studio.lock) { studio.model.workspace.findFirstChild(n) }?.let { studio.playAs(it) } } }
-        val uri = i?.data ?: return
-        if (i.action == Intent.ACTION_VIEW) { openMode = OpenMode.PLACE; onFilePicked(uri) }
+        val received = i ?: return
+        val uri = (if (received.action == Intent.ACTION_SEND) sentUri(received) else received.data) ?: return
+        if (received.action == Intent.ACTION_VIEW || received.action == Intent.ACTION_SEND) {
+            externalOpen = true
+            openMode = OpenMode.PLACE
+            onFilePicked(uri)
+        }
     }
+
+    @Suppress("DEPRECATION")
+    private fun sentUri(i: Intent): Uri? =
+        if (android.os.Build.VERSION.SDK_INT >= 33) i.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+        else i.getParcelableExtra(Intent.EXTRA_STREAM)
 
     override fun onResume() { super.onResume(); viewport.onResume() }
     override fun onPause() {
@@ -948,6 +960,8 @@ class MainActivity : AppCompatActivity(), MainActions, Studio.Listener, StartScr
 
     private fun onFilePicked(uri: Uri) {
         val mode = openMode
+        val external = externalOpen
+        externalOpen = false
         val name = displayName(uri)
         if (mode == OpenMode.PLACE) {
             try {
@@ -1007,8 +1021,19 @@ class MainActivity : AppCompatActivity(), MainActions, Studio.Listener, StartScr
                         } else {
                             runOnUiThread {
                                 lp?.dismiss()
-                                studio.insertDocument(doc)
-                                OutputLog.info("Inserted ${doc.roots.size} object(s) from $name")
+                                if (external) {
+                                    confirmDiscard {
+                                        closeAllScripts()
+                                        studio.newPlace()
+                                        (application as? StudioApp)?.placeOpened = true
+                                        closeStart()
+                                        studio.insertDocument(doc)
+                                        OutputLog.info("Opened $name in a new place (${doc.roots.size} object(s))")
+                                    }
+                                } else {
+                                    studio.insertDocument(doc)
+                                    OutputLog.info("Inserted ${doc.roots.size} object(s) from $name")
+                                }
                             }
                         }
                     }
